@@ -5,8 +5,8 @@ import re
 import time
 
 import torch
-
 import pytorch_mask_rcnn as pmr
+from torch_utils.models import maskrcnn_DINO
     
     
 def main(args):
@@ -17,11 +17,12 @@ def main(args):
         
     # ---------------------- prepare data loader ------------------------------- #
     
-    dataset_train = pmr.datasets(args.dataset, args.data_dir, "train2017", train=True)
+    dataset_train = pmr.datasets(args.dataset, args.data_dir, "val2017", train=True) # set train=True for eval
+    #dataset_train = pmr.datasets(args.dataset, args.data_dir, "train2017", train=False)
     indices = torch.randperm(len(dataset_train)).tolist()
     d_train = torch.utils.data.Subset(dataset_train, indices)
     
-    d_test = pmr.datasets(args.dataset, args.data_dir, "val2017", train=True) # set train=True for eval
+    #d_test = pmr.datasets(args.dataset, args.data_dir, "val2017", train=True) # set train=True for eval
         
     args.warmup_iters = max(1000, len(d_train))
     
@@ -29,8 +30,9 @@ def main(args):
 
     print(args)
     num_classes = max(d_train.dataset.classes) + 1 # including background class
-    model = pmr.maskrcnn_resnet50(True, num_classes).to(device)
-    
+    #model = pmr.maskrcnn_resnet50(True, num_classes).to(device)
+    model = maskrcnn_DINO(args, False, num_classes).to(device)
+    print(model)
     params = [p for p in model.parameters() if p.requires_grad]
     optimizer = torch.optim.SGD(
         params, lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
@@ -64,16 +66,16 @@ def main(args):
         iter_train = pmr.train_one_epoch(model, optimizer, d_train, device, epoch, args)
         A = time.time() - A
         
-        B = time.time()
-        eval_output, iter_eval = pmr.evaluate(model, d_test, device, args)
-        B = time.time() - B
+        #B = time.time()
+        #eval_output, iter_eval = pmr.evaluate(model, d_test, device, args)
+        #B = time.time() - B
 
         trained_epoch = epoch + 1
-        print("training: {:.1f} s, evaluation: {:.1f} s".format(A, B))
-        pmr.collect_gpu_info("maskrcnn", [1 / iter_train, 1 / iter_eval])
-        print(eval_output.get_AP())
+        print("training: {:.1f} s, evaluation: {:.1f} s".format(A))#, B))
+        pmr.collect_gpu_info("maskrcnn", [1 / iter_train])#, 1 / iter_eval])
+        #print(eval_output.get_AP())
 
-        pmr.save_ckpt(model, optimizer, trained_epoch, args.ckpt_path, eval_info=str(eval_output))
+        pmr.save_ckpt(model, optimizer, trained_epoch, args.ckpt_path)#, eval_info=str(eval_output))
 
         # it will create many checkpoint files during training, so delete some.
         prefix, ext = os.path.splitext(args.ckpt_path)
@@ -97,7 +99,7 @@ if __name__ == "__main__":
     parser.add_argument("--use-cuda", action="store_true")
     
     parser.add_argument("--dataset", default="coco", help="coco or voc")
-    parser.add_argument("--data-dir", default="E:/PyTorch/data/coco2017")
+    parser.add_argument("--data-dir", default="datasets/coco/images")
     parser.add_argument("--ckpt-path")
     parser.add_argument("--results")
     
@@ -110,6 +112,12 @@ if __name__ == "__main__":
     parser.add_argument("--epochs", type=int, default=3)
     parser.add_argument("--iters", type=int, default=10, help="max iters per epoch, -1 denotes auto")
     parser.add_argument("--print-freq", type=int, default=100, help="frequency of printing losses")
+    
+    parser.add_argument('--pretrained_weights', default='', type=str, help="Path to pretrained weights to evaluate.")
+    parser.add_argument('--arch', default='resnet50', type=str, help='Architecture')
+    parser.add_argument('--patch_size', default=16, type=int, help='Patch resolution of the model.')
+    parser.add_argument("--checkpoint_key", default="teacher", type=str,
+        help='Key to use in the checkpoint (example: "teacher")')
     args = parser.parse_args()
     
     if args.lr is None:

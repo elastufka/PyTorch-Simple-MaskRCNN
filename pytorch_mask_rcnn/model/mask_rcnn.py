@@ -1,10 +1,16 @@
 from collections import OrderedDict
-
+import os
+import torch
 import torch.nn.functional as F
 from torch import nn
 from torch.utils.model_zoo import load_url
 from torchvision import models
 from torchvision.ops import misc
+
+#import sys 
+#sys.path.append("/home/glados/unix-Documents/AstroSignals/mightee_dino")
+#print(sys.path)
+#from mightee_dino import utils as dino_utils
 
 from .utils import AnchorGenerator
 from .rpn import RPNHead, RegionProposalNetwork
@@ -144,6 +150,7 @@ class MaskRCNN(nn.Module):
         image, target = self.transformer(image, target)
         image_shape = image.shape[-2:]
         feature = self.backbone(image)
+        print(f"feature shape: {feature.shape}")
         
         proposal, rpn_losses = self.rpn(feature, image_shape, target)
         result, roi_losses = self.head(feature, proposal, image_shape, target)
@@ -269,3 +276,117 @@ def maskrcnn_resnet50(pretrained, num_classes, pretrained_backbone=True):
         model.load_state_dict(msd)
     
     return model
+
+# def get_DINO_teacher(args):
+#     # ============ building network ... ============
+#     if "vit" in args.arch:
+#         model = vits.__dict__[args.arch](patch_size=args.patch_size, num_classes=0)
+#         print(f"Model {args.arch} {args.patch_size}x{args.patch_size} built.")
+#     elif "xcit" in args.arch:
+#         model = torch.hub.load('facebookresearch/xcit:main', args.arch, num_classes=0)
+
+#     elif args.arch in torchvision_models.__dict__.keys():
+#             model = torchvision_models.__dict__[args.arch](num_classes=0)
+#             model.fc = nn.Identity()
+#         else:
+#             print(f"Architecture {args.arch} non supported")
+#             sys.exit(1)
+#     model.cuda()
+#     utils.load_pretrained_weights(model, args.pretrained_weights, args.checkpoint_key, args.arch, args.patch_size)
+#     return model
+
+# def load_pretrained_weights(model, pretrained_weights, checkpoint_key, model_name, patch_size):
+#     if os.path.isfile(pretrained_weights):
+#         state_dict = torch.load(pretrained_weights, map_location="cpu")
+#         if checkpoint_key is not None and checkpoint_key in state_dict:
+#             print(f"Take key {checkpoint_key} in provided checkpoint dict")
+#             state_dict = state_dict[checkpoint_key]
+#         # remove `module.` prefix
+#         state_dict = {k.replace("module.", ""): v for k, v in state_dict.items()}
+#         # remove `backbone.` prefix induced by multicrop wrapper
+#         state_dict = {k.replace("backbone.", ""): v for k, v in state_dict.items()}
+#         msg = model.load_state_dict(state_dict, strict=False)
+#         print('Pretrained weights found at {} and loaded with msg: {}'.format(pretrained_weights, msg))
+#     else:
+#         print("Please use the `--pretrained_weights` argument to indicate the path of the checkpoint to evaluate.")
+#         url = None
+#         if model_name == "vit_small" and patch_size == 16:
+#             url = "dino_deitsmall16_pretrain/dino_deitsmall16_pretrain.pth"
+#         elif model_name == "vit_small" and patch_size == 8:
+#             url = "dino_deitsmall8_pretrain/dino_deitsmall8_pretrain.pth"
+#         elif model_name == "vit_base" and patch_size == 16:
+#             url = "dino_vitbase16_pretrain/dino_vitbase16_pretrain.pth"
+#         elif model_name == "vit_base" and patch_size == 8:
+#             url = "dino_vitbase8_pretrain/dino_vitbase8_pretrain.pth"
+#         elif model_name == "xcit_small_12_p16":
+#             url = "dino_xcit_small_12_p16_pretrain/dino_xcit_small_12_p16_pretrain.pth"
+#         elif model_name == "xcit_small_12_p8":
+#             url = "dino_xcit_small_12_p8_pretrain/dino_xcit_small_12_p8_pretrain.pth"
+#         elif model_name == "xcit_medium_24_p16":
+#             url = "dino_xcit_medium_24_p16_pretrain/dino_xcit_medium_24_p16_pretrain.pth"
+#         elif model_name == "xcit_medium_24_p8":
+#             url = "dino_xcit_medium_24_p8_pretrain/dino_xcit_medium_24_p8_pretrain.pth"
+#         elif model_name == "resnet50":
+#             url = "dino_resnet50_pretrain/dino_resnet50_pretrain.pth"
+#         if url is not None:
+#             print("Since no pretrained weights have been provided, we load the reference pretrained DINO weights.")
+#             state_dict = torch.hub.load_state_dict_from_url(url="https://dl.fbaipublicfiles.com/dino/" + url)
+#             model.load_state_dict(state_dict, strict=True)
+#         else:
+#             print("There is no reference weights available for this model => We use random weights.")
+
+
+
+# def maskrcnn_DINO(dino_args, pretrained, num_classes, pretrained_backbone=True):
+#     """
+#     Constructs a Mask R-CNN model with a DINO teacher(ResNet-50) backbone.
+    
+#     Arguments:
+#         pretrained (bool): If True, returns a model pre-trained on COCO train2017.
+#         num_classes (int): number of classes (including the background).
+#     """
+    
+#     if pretrained:
+#         backbone_pretrained = False
+        
+#     ## load DINO teacher
+#     if "vit" in dino_args.arch:
+#         backbone = vits.__dict__[dino_args.arch](patch_size=dino_args.patch_size, num_classes=0)
+#         print(f"Model {dino_args.arch} {dino_args.patch_size}x{dino_args.patch_size} built.")
+#     elif "xcit" in dino_args.arch:
+#         backbone = torch.hub.load('facebookresearch/xcit:main', dino_args.arch, num_classes=0)
+#     elif dino_args.arch in models.__dict__.keys():
+#             backbone = models.__dict__[dino_args.arch](num_classes=0)
+#             backbone.fc = nn.Identity()
+#     else:
+#         print(f"Architecture {dino_args.arch} non supported")
+#         sys.exit(1)
+#     backbone.cuda()
+#     load_pretrained_weights(backbone, dino_args.pretrained_weights, dino_args.checkpoint_key, dino_args.arch, dino_args.patch_size)
+
+#     model = MaskRCNN(backbone, num_classes)
+    
+#     if pretrained:
+#         model_urls = {
+#             'maskrcnn_resnet50_fpn_coco':
+#                 'https://download.pytorch.org/models/maskrcnn_resnet50_fpn_coco-bf2d0c1e.pth',
+#         }
+#         model_state_dict = load_url(model_urls['maskrcnn_resnet50_fpn_coco'])
+        
+#         pretrained_msd = list(model_state_dict.values())
+#         del_list = [i for i in range(265, 271)] + [i for i in range(273, 279)]
+#         for i, del_idx in enumerate(del_list):
+#             pretrained_msd.pop(del_idx - i)
+
+#         msd = model.state_dict()
+#         skip_list = [271, 272, 273, 274, 279, 280, 281, 282, 293, 294]
+#         if num_classes == 91:
+#             skip_list = [271, 272, 273, 274]
+#         for i, name in enumerate(msd):
+#             if i in skip_list:
+#                 continue
+#             msd[name].copy_(pretrained_msd[i])
+            
+#         model.load_state_dict(msd)
+    
+#     return model

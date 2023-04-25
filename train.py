@@ -3,7 +3,10 @@ import glob
 import os
 import re
 import time
-
+import sys
+sys.path.append("/home/users/l/lastufka/cocoapi/PythonAPI")
+sys.path.append("/home/users/l/lastufka")
+print(sys.path)
 import torch
 import pytorch_mask_rcnn as pmr
 from torch_utils.models import maskrcnn_DINO
@@ -17,13 +20,18 @@ def main(args):
         
     # ---------------------- prepare data loader ------------------------------- #
     
-    dataset_train = pmr.datasets(args.dataset, args.data_dir, "val2017", train=True) # set train=True for eval
+    dataset_train = pmr.datasets(args.dataset, args.data_dir, "train2017", train=False) # set train=True for eval
     #dataset_train = pmr.datasets(args.dataset, args.data_dir, "train2017", train=False)
-    indices = torch.randperm(len(dataset_train)).tolist()
-    d_train = torch.utils.data.Subset(dataset_train, indices)
+    #indices = torch.randperm(len(dataset_train)).tolist()
+    #d_train = torch.utils.data.Subset(dataset_train, indices)
+
+    #EL add dataloader for batch size
+    d_train = torch.utils.data.DataLoader(dataset_train, batch_size = args.batch_size, shuffle=True, num_workers=args.num_workers)
+
+    dataset_test = pmr.datasets(args.dataset, args.data_dir, "val2017", train=True) # set train=True for eval
     
-    #d_test = pmr.datasets(args.dataset, args.data_dir, "val2017", train=True) # set train=True for eval
-        
+    #EL add dataloader for batch size
+    d_test = torch.utils.data.DataLoader(dataset_test, batch_size = args.batch_size, shuffle=True, num_workers=args.num_workers)
     args.warmup_iters = max(1000, len(d_train))
     
     # -------------------------------------------------------------------------- #
@@ -95,6 +103,7 @@ def main(args):
     
 if __name__ == "__main__":
     import argparse
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--use-cuda", action="store_true")
     
@@ -109,6 +118,8 @@ if __name__ == "__main__":
     parser.add_argument("--momentum", type=float, default=0.9)
     parser.add_argument("--weight-decay", type=float, default=0.0001)
     
+    parser.add_argument("--batch_size", type=float, default=32)
+    parser.add_argument("--num_workers", type=float, default=0)
     parser.add_argument("--epochs", type=int, default=3)
     parser.add_argument("--iters", type=int, default=10, help="max iters per epoch, -1 denotes auto")
     parser.add_argument("--print-freq", type=int, default=100, help="frequency of printing losses")
